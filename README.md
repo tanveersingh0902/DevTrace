@@ -6,7 +6,7 @@ DevTrace is an open-source Codebase Intelligence and Visualisation Platform that
 
 ## What DevTrace Does
 
-- **Scans repositories** to discover files, functions, and classes
+- **Scans repositories** to inventory files, folders, languages, and file metadata
 - **Detects dependencies** between files, functions, and modules
 - **Generates interactive graphs** showing how code is connected
 - **Identifies architectural patterns** and potential issues
@@ -48,6 +48,39 @@ uvicorn app.main:app --reload
 
 The API will be available at `http://localhost:8000` with interactive docs at `http://localhost:8000/docs`.
 
+### Scan a Local Repository
+
+The scanner is available at `POST /api/v1/scan`. It accepts a local filesystem path:
+
+```json
+{
+  "repository_path": "/path/to/repository"
+}
+```
+
+For example, from a shell:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/scan \
+  -H "Content-Type: application/json" \
+  -d '{"repository_path": "/path/to/repository"}'
+```
+
+For safety, scans are limited to `scan_allowed_roots`, which defaults to the server's current
+working directory. Set `SCAN_ALLOWED_ROOTS` in the backend environment to a JSON array of
+directories when repositories live elsewhere, for example:
+
+```text
+SCAN_ALLOWED_ROOTS=["/path/to/projects"]
+```
+
+The scanner does not execute source code or read source-file contents; it reads bounded
+`.gitignore` files to apply common ignore patterns. Language detection uses file extensions only,
+with unrecognized extensions reported as `Unknown`. It reports file metadata and language counts,
+skips symbolic links and files larger than `MAX_FILE_SIZE_BYTES`, and rejects scans exceeding
+`MAX_FILES`. Common generated/dependency directories are excluded. Absolute server paths are not
+included in the API response.
+
 ### Run Tests
 
 ```bash
@@ -60,11 +93,11 @@ pytest -v
 DevTrace is under active development.
 
 - [x] Project structure and configuration
-- [ ] Repository scanner
+- [x] Repository scanner and scan API
 - [ ] Code parser (Tree-sitter)
 - [ ] Dependency analysis
 - [ ] Graph generation
-- [ ] API endpoints
+- [ ] Remaining analysis API endpoints
 - [ ] React frontend
 - [ ] Interactive visualisation
 
@@ -72,10 +105,19 @@ DevTrace is under active development.
 
 | Language | Status |
 |----------|--------|
-| Python | 🔜 In Progress |
-| JavaScript | 🔜 Planned |
-| TypeScript | 🔜 Planned |
-| Java | 🔜 Planned |
+| Python | ✅ Detected |
+| Java | ✅ Detected |
+| JavaScript | ✅ Detected |
+| TypeScript | ✅ Detected |
+| Markdown | ✅ Detected |
+| JSON | ✅ Detected |
+| HTML | ✅ Detected |
+| CSS | ✅ Detected |
+| C / C++ | ✅ Detected |
+| Go | ✅ Detected |
+| Rust | ✅ Detected |
+| SQL | ✅ Detected |
+| Shell | ✅ Detected |
 
 ## Contributing
 
@@ -88,4 +130,3 @@ This project is licensed under the MIT License — see [LICENSE](LICENSE) for de
 ## Security
 
 To report a security vulnerability, please see [SECURITY.md](SECURITY.md).
-

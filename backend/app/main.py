@@ -23,6 +23,7 @@ Only use this in development, never in production.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.v1.scan import router as scan_router
 from app.config import settings
 
 app = FastAPI(
@@ -32,8 +33,8 @@ app = FastAPI(
         "Codebase Intelligence and Visualisation Platform. "
         "Analyse source code, detect dependencies, and generate interactive graphs."
     ),
-    docs_url="/docs",       # Swagger UI at /docs
-    redoc_url="/redoc",     # ReDoc at /redoc
+    docs_url="/docs",  # Swagger UI at /docs
+    redoc_url="/redoc",  # ReDoc at /redoc
 )
 
 # --- CORS Middleware ---
@@ -43,9 +44,11 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],      # Allow all HTTP methods (GET, POST, etc.)
-    allow_headers=["*"],      # Allow all headers
+    allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allow all headers
 )
+
+app.include_router(scan_router, prefix=settings.api_prefix)
 
 
 # --- Health Check ---
@@ -72,4 +75,3 @@ async def root():
         "docs": "/docs",
         "health": "/health",
     }
-

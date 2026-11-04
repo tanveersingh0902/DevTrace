@@ -16,6 +16,7 @@ WHY pydantic-settings?
 
 from pathlib import Path
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -44,8 +45,16 @@ class Settings(BaseSettings):
     database_url: str = "sqlite:///devtrace.db"
 
     # Scanner
-    max_file_size_bytes: int = 1_000_000  # 1 MB — skip huge generated files
-    max_files: int = 10_000  # Safety limit for very large repos
+    max_file_size_bytes: int = Field(
+        default=1_000_000,
+        gt=0,
+        description="Files larger than this limit are skipped.",
+    )
+    max_files: int = Field(default=10_000, gt=0, description="Maximum regular files per scan.")
+    scan_allowed_roots: list[Path] = Field(
+        default_factory=lambda: [Path.cwd()],
+        description="Directories from which repository scans are allowed.",
+    )
 
     # Optional AI features (Phase 3)
     openai_api_key: str | None = None
@@ -53,4 +62,3 @@ class Settings(BaseSettings):
 
 # Singleton instance — import this throughout the app
 settings = Settings()
-
