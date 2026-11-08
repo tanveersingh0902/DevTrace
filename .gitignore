@@ -12,6 +12,19 @@ htmlcov/
 .venv/
 backend/.venv/
 
+
+# Python packaging
+*.egg-info/
+**/*.egg-info/
+build/
+dist/
+
+# Python Virtual Environments
+venv/
+.venv/
+**/venv/
+**/.venv/
+
 # Node
 node_modules/
 frontend/node_modules/
