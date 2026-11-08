@@ -1,6 +1,6 @@
 # DevTrace Architecture
 
-**Status:** Phase 0 architecture baseline
+**Status:** Phase 0 architectural source of truth; Phase 1 foundation is implemented
 **Last updated:** 2026-11-08
 
 ## System boundary

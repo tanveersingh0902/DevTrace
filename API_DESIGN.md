@@ -2,7 +2,7 @@
 
 **Base path:** `/api/v1`
 **Format:** HTTPS JSON, UTF-8
-**Status:** Design contract only; endpoints are not implemented in Phase 0.
+**Status:** Design contract. Phase 1 implements only `/health`, `/ready`, and `/api/v1` metadata.
 
 ## Conventions
 

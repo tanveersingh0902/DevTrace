@@ -1,53 +1,93 @@
 # Development Status
 
 **Last updated:** 2026-11-08
-**Current phase:** Phase 0 — Architecture and planning
-**Status:** Complete for the requested documentation scope; implementation has not begun.
+**Current phase:** Phase 1 — Foundation and local development
+**Status:** Implementation complete; full runtime verification is blocked by missing local Python and Docker installations.
 
-## Completed
+## Completed functionality
 
-- Defined system boundaries, analysis pipeline, graph design, AI grounding, security,
-  authentication/authorization, and reliability/scaling approach.
-- Defined phased implementation sequencing and intentional deferrals.
-- Defined PostgreSQL entities, lifecycle, constraints/indexes, sensitive-data posture,
-  and migration policy.
-- Defined versioned API conventions, planned endpoints, and browser authentication flow.
+- Created the Phase 1 monorepo layout with `frontend`, `backend`, `docs`, Compose, and
+  environment/git configuration.
+- Created a React/TypeScript/Vite/Tailwind foundation with React Router, Axios, Lucide,
+  a dark application shell, dashboard placeholder, reusable button/input/card components,
+  and loading/error/empty state components.
+- Created a FastAPI foundation with `/health`, `/ready`, `/api/v1`, environment settings,
+  structured JSON logging, request IDs, centralized problem-details errors, configurable
+  CORS, dependency injection, and separated API/core/model/repository/service modules.
+- Created lazy SQLAlchemy connection pooling and reusable session dependencies. No schema
+  auto-creation is used. `/ready` executes a database `SELECT 1` and safely reports `503`
+  when unavailable.
+- Created an Alembic environment and intentionally empty Phase 1 baseline revision; no
+  application schema is prematurely introduced.
+- Created Dockerfiles and Docker Compose services for frontend, backend, and PostgreSQL
+  with database health checks, service dependencies, environment-driven configuration, and
+  persistent storage.
+- Added frontend Vitest/React Testing Library tests and backend Pytest endpoint/startup/
+  database-behavior tests.
 
-## Files created
+## Files created or modified
 
-- `ARCHITECTURE.md`
-- `DEVELOPMENT_ROADMAP.md`
-- `DATABASE_DESIGN.md`
-- `API_DESIGN.md`
-- `DEVELOPMENT_STATUS.md`
+### Root and documentation
 
-## Files modified
+- `.dockerignore`, `.env.example`, `.gitignore`, `docker-compose.yml`, `README.md`
+- `docs/README.md`
+- `DEVELOPMENT_STATUS.md` (updated from Phase 0)
 
-- None.
+### Backend
 
-## Functionality and testing
+- `backend/Dockerfile`, `backend/pyproject.toml`, `backend/alembic.ini`
+- `backend/app/` foundation modules for API, core settings/logging/database/request IDs,
+  models, repositories, services, analysis, AI, workers, and `main.py`
+- `backend/alembic/` environment, migration template, and Phase 1 baseline revision
+- `backend/tests/conftest.py`, `backend/tests/test_system.py`
 
-No application functionality, dependency manifest, database migration, Docker setup, or
-test suite exists. This is intentional: Phase 0 is documentation-only. No executable
-feature tests exist, so no implementation feature is claimed complete.
+### Frontend
 
-Verification commands:
+- `frontend/Dockerfile`, `frontend/package.json`, `frontend/package-lock.json`
+- Vite, TypeScript, Tailwind, PostCSS, and Vitest configuration
+- `frontend/src/` application shell, dashboard placeholder, components, API client, styles,
+  test setup, and route tests
+
+## Tests and verification executed
+
+| Command | Result |
+| --- | --- |
+| `npm.cmd run test -- --run` in `frontend` | Passed: 1 file, 2 tests |
+| `npm.cmd run build` in `frontend` | Passed: TypeScript check and Vite production build |
+| `npm.cmd run dev -- --host 127.0.0.1` plus `Invoke-WebRequest http://127.0.0.1:5173/` | Passed: frontend served HTTP 200 |
+| Backend Pytest, Alembic upgrade, FastAPI runtime checks | Not run: Python 3.11+ is not installed or on PATH |
+| Docker Compose startup, PostgreSQL readiness/migration checks | Not run: Docker is not installed or on PATH |
+
+## Commands to run and verify
 
 ```powershell
-Get-ChildItem ARCHITECTURE.md, DEVELOPMENT_ROADMAP.md, DATABASE_DESIGN.md, API_DESIGN.md, DEVELOPMENT_STATUS.md
-Select-String -Path ARCHITECTURE.md, DEVELOPMENT_ROADMAP.md, DATABASE_DESIGN.md, API_DESIGN.md, DEVELOPMENT_STATUS.md -Pattern '^# '
+Copy-Item .env.example .env
+docker compose up --build
+docker compose exec backend alembic upgrade head
+Invoke-WebRequest http://localhost:8000/health
+Invoke-WebRequest http://localhost:8000/ready
+docker compose down
 ```
+
+For local non-Docker development, see the full Python virtual-environment, migration,
+backend, frontend, and test commands in `README.md`.
 
 ## Known limitations
 
-- The first supported analysis language is not selected/implemented; TypeScript/JavaScript
-  is only the documented initial recommendation.
-- Repository ingestion mode, deployment target, secret-management service, and AI provider
-  selection are deferred to their implementation phases.
-- Real-time updates, graph/vector databases, cache/broker infrastructure, private-repo
-  OAuth, SSO, and runtime tracing are intentionally deferred.
+- This environment has Node/npm but lacks Python 3.11+ and Docker; backend and Compose
+  verification must be run after installing those documented prerequisites.
+- The repository directory is not currently a Git checkout, so Git-based diff checks are
+  unavailable in this environment.
+- Phase 2 authentication and all repository ingestion, static analysis, graph, worker, and
+  AI features are intentionally absent.
+- The Phase 1 Alembic revision does not create domain tables by design; schema work belongs
+  to the owning feature phases.
 
-## Next phase
+## Exit-criteria assessment
 
-Phase 1 is limited to frontend/backend/database/container/test foundations. It has not
-been started.
+Frontend Phase 1 exit criteria are satisfied and tested. The implementation contains the
+required backend, migration, and Docker foundations, but the overall Phase 1 exit criteria
+cannot be confirmed until a machine with Python 3.11+ and Docker runs backend tests,
+migrations, `/health`, `/ready`, and `docker compose up --build` successfully.
+
+No Phase 2 work has started.

@@ -10,13 +10,13 @@
 - Schema changes require Alembic migrations; API changes update `API_DESIGN.md`.
 - Keep scope narrow, avoid unnecessary dependencies, and never use mock production behavior.
 
-## Phase 0 — Architecture and planning (current)
+## Phase 0 — Architecture and planning (complete)
 
 Create the requested architecture, data, API, roadmap, and status documentation only. No
 application code, database schema, dependency manifest, container setup, or test framework
 is introduced.
 
-## Phase 1 — Foundation and local development
+## Phase 1 — Foundation and local development (current)
 
 Create React/TypeScript/Vite/Tailwind shell; FastAPI app; configuration, errors and
 health/readiness endpoints; SQLAlchemy/Alembic/PostgreSQL foundation; Docker Compose;
