@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from contextlib import asynccontextmanager
 from http import HTTPStatus
 from typing import AsyncIterator
@@ -15,6 +16,7 @@ from app.api.system import router as system_router
 from app.api.v1.router import router as v1_router
 from app.core.config import Settings, get_settings
 from app.core.database import database
+from app.core.errors import ApplicationError
 from app.core.logging import configure_logging
 from app.core.request_id import request_id_context
 
@@ -29,6 +31,7 @@ def problem_response(
     detail: str,
     code: str,
     errors: object | None = None,
+    headers: dict[str, str] | None = None,
 ) -> JSONResponse:
     payload: dict[str, object] = {
         "type": f"https://devtrace.local/problems/{code}",
@@ -40,7 +43,10 @@ def problem_response(
     }
     if errors is not None:
         payload["errors"] = errors
-    return JSONResponse(status_code=status_code, content=payload, media_type="application/problem+json")
+    return JSONResponse(
+        status_code=status_code, content=payload,
+        media_type="application/problem+json", headers=headers,
+    )
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -55,6 +61,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         logger.info("application stopped")
 
     app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
+    app.state.settings = settings
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -65,11 +72,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.middleware("http")
     async def add_request_id(request: Request, call_next):
-        request_id = request.headers.get("X-Request-ID") or str(uuid4())
+        supplied_id = request.headers.get("X-Request-ID", "")
+        request_id = (
+            supplied_id if re.fullmatch(r"[A-Za-z0-9._-]{1,128}", supplied_id) else str(uuid4())
+        )
         token = request_id_context.set(request_id)
         request.state.request_id = request_id
         try:
-            response = await call_next(request)
+            try:
+                response = await call_next(request)
+            except Exception as exc:
+                # Handle before ServerErrorMiddleware re-raises to the ASGI logger.
+                response = await handle_unexpected_error(request, exc)
         finally:
             request_id_context.reset(token)
         response.headers["X-Request-ID"] = request_id
@@ -84,22 +98,35 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             title=HTTPStatus(exc.status_code).phrase,
             detail=detail,
             code="http_error",
+            headers=exc.headers,
+        )
+
+    @app.exception_handler(ApplicationError)
+    async def handle_application_error(request: Request, exc: ApplicationError) -> JSONResponse:
+        return problem_response(
+            request, status_code=exc.status_code, title=HTTPStatus(exc.status_code).phrase,
+            detail=exc.detail, code=exc.code, headers=exc.headers,
         )
 
     @app.exception_handler(RequestValidationError)
     async def handle_validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
         return problem_response(
             request,
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
             title="Validation error",
             detail="Request validation failed.",
             code="validation_error",
-            errors=exc.errors(),
+            # Pydantic errors contain raw input and sometimes non-serializable context.
+            errors=[
+                {"type": error["type"], "loc": error["loc"], "msg": "Invalid value."}
+                for error in exc.errors()
+            ],
         )
 
     @app.exception_handler(Exception)
     async def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
-        logger.exception("unhandled request exception")
+        # Exception strings/tracebacks can contain SQL parameters and submitted secrets.
+        logger.error("unhandled request exception (%s)", type(exc).__name__)
         return problem_response(
             request,
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

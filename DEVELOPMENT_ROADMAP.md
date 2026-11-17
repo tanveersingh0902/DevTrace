@@ -16,7 +16,7 @@ Create the requested architecture, data, API, roadmap, and status documentation 
 application code, database schema, dependency manifest, container setup, or test framework
 is introduced.
 
-## Phase 1 — Foundation and local development (current)
+## Phase 1 — Foundation and local development (complete)
 
 Create React/TypeScript/Vite/Tailwind shell; FastAPI app; configuration, errors and
 health/readiness endpoints; SQLAlchemy/Alembic/PostgreSQL foundation; Docker Compose;
@@ -26,13 +26,25 @@ Exit: clean checkout starts locally; health/database migration integration tests
 frontend route/component tests pass. No authentication, repository processing, analysis,
 or AI is included.
 
-## Phase 2 — Identity and project access
+## Phase 2 — Identity and project access (current)
 
 Implement users, refresh sessions, projects/memberships; Argon2id/JWT/rotating-refresh
 authentication; resource-level roles; audit events; login/register/protected routes and
 project list/create UI; and rate limits.
 
 Exit: token rotation, revocation, authorization matrix, and cross-project denial tested.
+
+Delivery is gated by user verification after each milestone; see
+`docs/PHASE_2_MILESTONES.md`. Use locally installed PostgreSQL, without Docker.
+
+1. Registration foundation: users, Argon2id, unique normalized email, registration audit,
+   shared registration rate limits, migration and PostgreSQL tests.
+2. Authentication sessions: login, JWT access, opaque rotating refresh tokens, reuse
+   detection, expiry, revocation/logout, protected dependencies and authentication audit.
+3. Project access: CRUD, ownership, Owner/Admin/Member/Viewer memberships, resource-level
+   authorization, audit events and the authorization/cross-project test matrix.
+4. Frontend and exit verification: register/login, auth context, protected routes,
+   dashboard/create project, logout, component tests and complete Phase 2 verification.
 
 ## Phase 3 — Repository registration and durable jobs
 

@@ -1,0 +1,19 @@
+from datetime import datetime
+
+from sqlalchemy import CheckConstraint, DateTime, Index, String
+from sqlalchemy.orm import Mapped, mapped_column
+
+from app.models.base import Base
+
+
+class AuthRateLimit(Base):
+    __tablename__ = "auth_rate_limits"
+    __table_args__ = (
+        CheckConstraint("attempts > 0", name="ck_auth_rate_limits_attempts"),
+        Index("ix_auth_rate_limits_expires_at", "expires_at"),
+    )
+
+    scope: Mapped[str] = mapped_column(String(32), primary_key=True)
+    key_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    attempts: Mapped[int] = mapped_column()
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

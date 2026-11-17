@@ -2,7 +2,8 @@
 
 **Base path:** `/api/v1`
 **Format:** HTTPS JSON, UTF-8
-**Status:** Design contract. Phase 1 implements only `/health`, `/ready`, and `/api/v1` metadata.
+**Status:** `/health`, `/ready`, `/api/v1` metadata, and `/api/v1/auth/register` are
+implemented. All other feature endpoints below remain planned.
 
 ## Conventions
 
@@ -16,7 +17,8 @@
   rejected.
 - Errors use problem-details fields: `type`, `title`, `status`, `detail`, `code`,
   `request_id`, and validation `errors` where applicable. Never expose stack traces,
-  secrets, raw source, provider errors, or account-existence clues.
+  secrets, raw source, or provider errors. Login failures must not reveal whether an
+  account exists; the registration duplicate-status tradeoff is documented below.
 
 ## Endpoint plan
 
@@ -31,14 +33,15 @@
 | `GET` | `/auth/me` | Authenticated | Read current user |
 | `POST` | `/auth/change-password` | Authenticated | Change password and revoke other sessions |
 | `GET`, `POST` | `/projects` | Authenticated | List/create projects |
-| `GET`, `PATCH` | `/projects/{project_id}` | Viewer / Editor | Read/update project |
-| `GET`, `POST` | `/projects/{project_id}/members` | Viewer / Owner | List/add or change membership |
-| `DELETE` | `/projects/{project_id}/members/{user_id}` | Owner | Remove member |
-| `GET`, `POST` | `/projects/{project_id}/repository-sources` | Viewer / Editor | List/register safe source metadata |
-| `PATCH` | `/projects/{project_id}/repository-sources/{source_id}` | Editor | Update safe source configuration |
-| `GET`, `POST` | `/projects/{project_id}/analysis-runs` | Viewer / Editor | List/create queued run (`202`) |
+| `GET`, `PATCH` | `/projects/{project_id}` | Viewer / Admin | Read/update project |
+| `DELETE` | `/projects/{project_id}` | Owner | Delete project (retention rules apply) |
+| `GET`, `POST` | `/projects/{project_id}/members` | Viewer / Admin | List/add or change membership |
+| `DELETE` | `/projects/{project_id}/members/{user_id}` | Admin | Remove member within role restrictions |
+| `GET`, `POST` | `/projects/{project_id}/repository-sources` | Viewer / Admin | List/register safe source metadata |
+| `PATCH` | `/projects/{project_id}/repository-sources/{source_id}` | Admin | Update safe source configuration |
+| `GET`, `POST` | `/projects/{project_id}/analysis-runs` | Viewer / Member | List/create queued run (`202`) |
 | `GET` | `/projects/{project_id}/analysis-runs/{run_id}` | Viewer | Run status/counts |
-| `POST` | `/projects/{project_id}/analysis-runs/{run_id}/cancel` | Editor | Request cancellation (`202`) |
+| `POST` | `/projects/{project_id}/analysis-runs/{run_id}/cancel` | Member | Request cancellation (`202`) |
 | `GET` | `/projects/{project_id}/analysis-runs/{run_id}/summary` | Viewer | Architecture/diagnostic summary |
 | `GET` | `/projects/{project_id}/analysis-runs/{run_id}/files` | Viewer | Paginated file inventory |
 | `GET` | `/projects/{project_id}/analysis-runs/{run_id}/files/{file_id}` | Viewer | File declarations/diagnostics |
@@ -51,6 +54,61 @@
 | `POST` | `/projects/{project_id}/ai/conversations/{conversation_id}/messages` | Viewer | Ask grounded question |
 
 ## Behavior details
+
+### Implemented: registration (Phase 2, Milestone 1)
+
+`POST /api/v1/auth/register` takes exactly these JSON fields:
+
+```json
+{
+  "email": "person@example.com",
+  "password": "a long unique passphrase",
+  "display_name": "Person"
+}
+```
+
+Email is validated, trimmed and lowercased, with a maximum normalized length of 254.
+Addresses are case insensitive; aliases such as `+tag` and dots are not rewritten.
+Passwords are 12–128 characters, are not trimmed, and use Argon2id. Display names are
+trimmed, nonblank, 1–100 characters, with no ASCII control characters. Unknown fields
+are rejected. Email syntax validation does not verify mailbox ownership or deliverability.
+
+`201` returns only `id`, `email`, `display_name`, `is_active`, `created_at`, and `updated_at`.
+It does not log the user in, create a session, set cookies, or return tokens. Registration
+and `user.registered` audit insertion commit together.
+
+| Status | Code | Meaning |
+| --- | --- | --- |
+| 409 | `registration_conflict` | Registration could not be completed (duplicate normalized email) |
+| 422 | `validation_error` | Invalid fields; safe locations/types only, no raw input/context |
+| 429 | `rate_limited` | Registration budget exhausted; `Retry-After` gives seconds |
+| 500 | `internal_error` | Unexpected failure; safe response with request ID |
+
+The duplicate response has generic wording but its status distinguishes existing emails;
+it is not enumeration-proof. Full indistinguishable registration would need a mailbox
+verification flow. Login will use generic invalid-credential responses in Milestone 2.
+
+Registration allows five attempts per client address per 3,600-second window by default.
+Counters are PostgreSQL-backed and survive worker restarts. Valid JSON requests consume
+the budget before field validation or hashing; rejected and duplicate requests also count.
+Malformed JSON is rejected by FastAPI before dependencies. Expired counters are removed
+on subsequent attempts. Rate-limit failure is closed if PostgreSQL is unavailable.
+Configure with `REGISTRATION_RATE_LIMIT` and `REGISTRATION_RATE_WINDOW_SECONDS`.
+
+The application uses the ASGI peer address, not forwarded headers directly. For local
+startup use `--no-proxy-headers`; deployments must configure only explicitly trusted proxy
+addresses at the server layer. SHA-256 client-address digests are transient rate-limit
+keys, not an anonymization guarantee.
+
+`X-Request-ID` accepts 1–128 ASCII letters, digits, periods, underscores, or hyphens;
+invalid values are replaced with a generated UUID. Neither validation nor unexpected
+error responses/logs include request bodies, SQL parameter values, or exception messages.
+
+### Planned project and analysis behavior
+
+Roles are Owner, Admin, Member and Viewer. Minimum roles in the table follow the matrix
+in `ARCHITECTURE.md`; Admin membership operations are restricted to Member/Viewer, while
+only the Owner manages Admins. Nonmembers will receive resource-safe denial responses.
 
 Project responses include ID, name, slug, description, current role, and timestamps.
 Analysis runs include source reference, status, snapshot identity, analyzer version, counts,

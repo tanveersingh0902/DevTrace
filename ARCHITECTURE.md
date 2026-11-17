@@ -1,7 +1,7 @@
 # DevTrace Architecture
 
-**Status:** Phase 0 architectural source of truth; Phase 1 foundation is implemented
-**Last updated:** 2026-11-08
+**Status:** Architectural source of truth; Phase 2 registration milestone implemented
+**Last updated:** 2026-11-18
 
 ## System boundary
 
@@ -107,11 +107,19 @@ session ID, issuer/audience, token type, issued/expiry. Logout revokes the curre
 password change/account disable revoke all. Every project/run/file/graph/source/AI action
 has service-layer resource membership enforcement.
 
-| Role | Configure project | Start/cancel analysis | Read/ask AI | Manage members |
-| --- | --- | --- | --- | --- |
-| Owner | Yes | Yes | Yes | Yes |
-| Editor | Yes | Yes | Yes | No |
-| Viewer | No | No | Yes | No |
+Phase 2's requested roles replace the original Editor design. This matrix is planned for
+Milestone 3; analysis and AI actions remain in their later phases.
+
+| Role | Configure project | Delete project | Start/cancel analysis | Read/ask AI | Manage members |
+| --- | --- | --- | --- | --- | --- |
+| Owner | Yes | Yes | Yes | Yes | All non-owner memberships |
+| Admin | Yes | No | Yes | Yes | Member/Viewer only |
+| Member | No | No | Yes | Yes | No |
+| Viewer | No | No | No | Yes | No |
+
+Each project has exactly one owner. Ownership transfer is outside the initial membership
+API; no membership mutation may remove or demote the owner. Admins cannot grant Admin or
+Owner, or change another Admin. All enforcement belongs in backend services.
 
 ## Security and scaling
 

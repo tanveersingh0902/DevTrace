@@ -34,5 +34,6 @@ frontend/coverage/
 # Tooling and OS
 .mypy_cache/
 .ruff_cache/
+.local/
 .DS_Store
 Thumbs.db

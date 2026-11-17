@@ -3,6 +3,40 @@
 **Database:** PostgreSQL 15+
 **Access/migrations:** SQLAlchemy 2.x and Alembic
 
+**Implemented:** Phase 2 Milestone 1 creates `users`, `audit_events`, and
+`auth_rate_limits`. Other tables in the design remain planned.
+
+## Milestone 1 schema
+
+Alembic revision `20261117_0002` follows the unchanged empty Phase 1 baseline
+`20261108_0001`. No ORM schema auto-creation is used.
+
+- `users`: UUID primary key; `email varchar(254)` with named unique constraint
+  `uq_users_email` and a lowercase/trimmed check; `password_hash varchar(255)`;
+  nonblank `display_name varchar(100)`; active flag defaulting to true; UTC-aware
+  creation/update timestamps. The ORM updates `updated_at` on user changes.
+- `audit_events`: UUID primary key, nullable actor foreign key to users (`RESTRICT`),
+  event type, target type/UUID, bounded request ID, creation timestamp. Indexes cover
+  actor/time and request ID. Registration records `user.registered` in the same
+  transaction as the user. No email, password/hash, token or arbitrary request payload
+  is stored in the event. Project references and additional event kinds arrive with
+  their owning milestones.
+- `auth_rate_limits`: composite primary key `(scope, key_hash)`, positive attempt count,
+  expiration timestamp and expiration index. The key is SHA-256 of the ASGI client
+  address. Atomic PostgreSQL upserts serialize concurrent callers; counters are capped
+  at limit + 1. Each new window starts at the first attempt and uses database time.
+  Budget consumption commits separately so rejected registrations still count.
+
+Passwords use the explicit Argon2id RFC 9106 low-memory profile (64 MiB, three iterations,
+four lanes, random per-password salt). The encoded hash holds the algorithm parameters
+and salt; plaintext passwords never persist. Audit failure rolls back account creation.
+Uniqueness is enforced by PostgreSQL even for simultaneous registrations.
+
+Integration tests require a separate local database ending in `_test`. Each test creates
+and migrates a random `devtrace_test_<uuid>` schema and drops only that schema afterward.
+They exercise real PostgreSQL constraints, migration upgrade/downgrade, schema drift,
+concurrency, rollback and API persistence. SQLite is not substituted.
+
 ## Data rules
 
 - PostgreSQL is authoritative for product and analysis state.

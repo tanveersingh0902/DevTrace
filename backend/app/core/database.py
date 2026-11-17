@@ -26,6 +26,7 @@ class Database:
                 pool_recycle=1800,
                 pool_size=self._settings.database_pool_size,
                 max_overflow=self._settings.database_max_overflow,
+                hide_parameters=True,
             )
         return self._engine
 

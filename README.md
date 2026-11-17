@@ -1,108 +1,140 @@
 # DevTrace
 
-DevTrace is an open-source codebase intelligence platform. It will help developers
-understand unfamiliar repositories through static source analysis, dependency mapping,
-architecture exploration, execution-flow modeling, and grounded AI explanations.
+DevTrace is an open-source codebase intelligence platform for understanding repositories
+through static analysis, dependency mapping, architecture exploration and grounded AI.
 
-This repository currently implements **Phase 1: Foundation and local development** only.
-It includes a React shell, a FastAPI service, PostgreSQL/Alembic wiring, Docker Compose,
-and automated test setup. Authentication, repository ingestion, analysis, graphs, and AI
-features are intentionally not present yet.
+Phase 1 is complete. **Phase 2, Milestone 1: registration foundation** is implemented.
+The API supports account registration with Argon2id, normalized unique emails, audit events
+and shared rate limits. Login, JWT/refresh sessions, projects, RBAC and authentication UI
+are scheduled in the remaining Phase 2 milestones. Analysis and AI remain deferred.
 
-## Technology stack
+## Stack and prerequisites
 
-- Frontend: React, TypeScript, Vite, Tailwind CSS, React Router, Axios, Lucide React
 - Backend: Python 3.11+, FastAPI, Pydantic, SQLAlchemy 2.x, Alembic
-- Database: PostgreSQL 15+ (Docker uses PostgreSQL 16)
-- Tests: Vitest/React Testing Library and Pytest
-- Local orchestration: Docker Compose
+- Frontend: Node.js 20+, React, TypeScript, Vite, Tailwind, React Router, Axios
+- Database: locally installed PostgreSQL 15+ (verified with PostgreSQL 18)
+- Tests: Pytest and Vitest/React Testing Library
 
-## Prerequisites
+Use local PostgreSQL for this phase. Docker is not required or used. Historical container
+files remain from Phase 1.
 
-- Node.js 20+ and npm
-- Python 3.11+
-- Docker Desktop with Docker Compose (recommended for PostgreSQL and full-stack startup)
+## Local database setup
 
-## Environment configuration
+Start your installed PostgreSQL service. On Windows its name depends on your installation
+(for example, `postgresql-x64-18`). Use Services or an elevated terminal if required.
+Ensure PostgreSQL's `bin` directory is on PATH before running the following commands.
 
-Copy the example before using Docker Compose or local database-backed commands:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Change `POSTGRES_PASSWORD` and update `DATABASE_URL` to the same password. `.env` is
-ignored by Git and must never contain a production secret committed to the repository.
-
-## Docker startup
+Create a development login interactively; choose a local password when prompted:
 
 ```powershell
-docker compose up --build
+createuser -h localhost -U postgres --pwprompt devtrace
+createdb -h localhost -U postgres --owner=devtrace devtrace
+createdb -h localhost -U postgres --owner=devtrace devtrace_test
 ```
 
-Open the frontend at `http://localhost:5173`, API docs at `http://localhost:8000/docs`,
-and health endpoints at `http://localhost:8000/health` and `http://localhost:8000/ready`.
-Run migrations in the backend service after startup:
+Do not recreate these objects if they already exist. `devtrace_test` is a separate database
+for tests; never point tests at your development or production database.
+
+From the repository root, create `.env` only if missing:
 
 ```powershell
-docker compose exec backend alembic upgrade head
+if (!(Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-Stop services while retaining database data:
+Edit `DATABASE_URL` in `.env` to match your local credentials, using the
+`postgresql+psycopg://` scheme and `localhost`. Percent-encode special characters in the
+URL password. Do not commit `.env`. `POSTGRES_*` variables describe the local setup but do
+not create a database automatically. Registration limits default to five attempts per
+client address per hour and can be configured in `.env`.
+
+## Backend setup and startup
+
+From the repository root, using a standalone Python installation:
 
 ```powershell
-docker compose down
+py -3 -m venv backend/.venv
+backend/.venv/Scripts/python.exe -m pip install -e "./backend[dev]"
+backend/.venv/Scripts/python.exe -m alembic -c backend/alembic.ini upgrade head
+backend/.venv/Scripts/python.exe -m uvicorn app.main:app --app-dir backend --reload --no-proxy-headers
 ```
 
-To also remove the local database volume (destructive):
+Open API docs at `http://localhost:8000/docs`. Check liveness/readiness:
 
 ```powershell
-docker compose down --volumes
+Invoke-RestMethod http://localhost:8000/health
+Invoke-RestMethod http://localhost:8000/ready
 ```
 
-## Local development
+Migrations create users, audit events and authentication rate-limit tables. The application
+never calls ORM `create_all`. `--no-proxy-headers` keeps local rate limits tied to the real
+peer address; configure explicit trusted proxies if deploying behind a proxy.
 
-Backend (PowerShell):
+## Try registration
 
 ```powershell
-py -3.11 -m venv backend/.venv
-backend/.venv/Scripts/Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -e "./backend[dev]"
-Copy-Item .env.example .env
-alembic -c backend/alembic.ini upgrade head
-uvicorn app.main:app --app-dir backend --reload
+$body = @{
+  email = 'person@example.com'
+  password = 'replace with a unique passphrase'
+  display_name = 'Person'
+} | ConvertTo-Json
+Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/v1/auth/register -ContentType 'application/json' -Body $body
 ```
 
-Frontend (a second terminal):
+The first request returns HTTP 201 and public user fields. Repeating the email returns
+409. Invalid fields return 422. Attempts beyond the configured budget return 429 with
+`Retry-After`. Registration does not start a session or issue tokens yet.
+
+## Frontend
+
+In a second terminal:
 
 ```powershell
 Set-Location frontend
-npm install
+npm ci
 npm run dev
 ```
 
-For local development, start PostgreSQL with `docker compose up db -d` first. If the API
-runs outside Docker, `DATABASE_URL` in `.env` must use `localhost`, as shown in the example.
+Open `http://localhost:5173`. Milestone 1 preserves the existing frontend shell; registration
+and login pages will arrive together with complete browser authentication in Milestone 4.
 
-## Testing
+## Tests and migration checks
 
-Backend tests do not require a running PostgreSQL instance because connection outcomes are
-isolated at the database boundary:
+Backend unit/system tests without PostgreSQL:
 
 ```powershell
-backend/.venv/Scripts/python.exe -m pytest backend/tests
+backend/.venv/Scripts/python.exe -m pytest backend/tests -m "not postgres"
 ```
 
-Frontend tests:
+Complete backend suite, including real PostgreSQL registration and migration tests:
+
+```powershell
+$env:TEST_DATABASE_URL = 'postgresql+psycopg://devtrace:YOUR_URL_ENCODED_PASSWORD@localhost:5432/devtrace_test'
+backend/.venv/Scripts/python.exe -m pytest backend/tests -ra
+backend/.venv/Scripts/python.exe -m alembic -c backend/alembic.ini check
+```
+
+`TEST_DATABASE_URL` must be set in the shell, not just `.env`. It must name a local database
+ending in `_test`, owned by the test login so it can create schemas. Tests create/migrate a
+random schema per test and remove only that schema. They do not drop the database or touch
+its public schema. PostgreSQL tests explicitly skip if the variable is absent; such a run
+is not full milestone verification. A configured but unavailable database fails the tests.
+`alembic check` uses the normal `DATABASE_URL` and should follow `upgrade head`.
+
+Frontend tests and TypeScript/production build:
 
 ```powershell
 Set-Location frontend
 npm run test -- --run
+npm run build
 ```
 
-## Phase boundary
+## Delivery status
 
-Follow [DEVELOPMENT_ROADMAP.md](DEVELOPMENT_ROADMAP.md) and
-[DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md). Do not add Phase 2 authentication or any
-analysis, graph, repository scanning, or AI functionality while working on Phase 1.
+See [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md) for executed verification and
+[docs/PHASE_2_MILESTONES.md](docs/PHASE_2_MILESTONES.md) for milestones, implementation
+decisions and the file guide. API and schema details are in [API_DESIGN.md](API_DESIGN.md)
+and [DATABASE_DESIGN.md](DATABASE_DESIGN.md).
+
+Work stops after Milestone 1 for user verification. Phase 2 is not complete until token
+rotation/revocation, the authorization matrix, cross-project denial and browser flows
+are implemented and tested. Do not start Phase 3.

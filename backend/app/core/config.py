@@ -28,6 +28,12 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
     database_pool_size: int = Field(default=5, validation_alias="DATABASE_POOL_SIZE")
     database_max_overflow: int = Field(default=10, validation_alias="DATABASE_MAX_OVERFLOW")
+    registration_rate_limit: int = Field(
+        default=5, ge=1, le=1000, validation_alias="REGISTRATION_RATE_LIMIT"
+    )
+    registration_rate_window_seconds: int = Field(
+        default=3600, ge=1, le=86400, validation_alias="REGISTRATION_RATE_WINDOW_SECONDS"
+    )
 
     @property
     def cors_origins(self) -> list[str]:
