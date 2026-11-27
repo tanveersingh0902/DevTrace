@@ -1,0 +1,29 @@
+name: Bug report
+description: Report unexpected behavior in an implemented feature.
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a suspected vulnerability, use the security policy linked in the issue chooser. Remove credentials and personal data from examples.
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and actual behavior
+      description: What did you expect to happen, and what did DevTrace do?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Give the smallest repeatable example using sample data.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include the commit, operating system, and relevant Python, PostgreSQL, Node.js, or browser versions.
+    validations:
+      required: true

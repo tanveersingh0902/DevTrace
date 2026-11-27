@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Private security reporting
+    url: https://github.com/tanveersingh0902/DevTrace/security/policy
+    about: Read the reporting policy before sharing vulnerability details.

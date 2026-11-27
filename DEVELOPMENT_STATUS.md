@@ -1,11 +1,63 @@
 # Development Status
 
-**Last updated:** 2026-11-18
-**Current phase:** Phase 2 - Identity and project access
-**Status:** Milestone 1 implemented and verified; awaiting user verification before Milestone 2.
-**Phase 2 overall:** In progress. Exit criteria are not yet satisfied.
+Updated November 27, 2026. Phase OS-1 establishes the open-source repository foundation on
+`chore/open-source-foundation`. Phase 2 remains in progress. Registration is implemented.
+The next milestone, **Phase 2 Milestone 2 — Authentication and Sessions**, awaits manual approval.
 
-## Completed functionality
+## Phase OS-1 — Repository foundation
+
+The audit found a React dashboard shell, a FastAPI modular monolith, two Alembic revisions,
+and PostgreSQL registration integration tests. The backend declares Python 3.11+ and uses
+pip with the `dev` extra. The frontend uses npm with a committed cross-platform lockfile.
+The project documents Node.js 20+ and PostgreSQL 15+. Neither stack defines a lint or
+format command. Package versions in the manifests describe the software under development.
+The changelog tracks this work under Unreleased.
+
+| Files | OS-1 change |
+| --- | --- |
+| `LICENSE`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md` | Added the MIT license, contribution workflow, Contributor Covenant adoption, and private reporting instructions. |
+| `ROADMAP.md`, `CHANGELOG.md` | Added a public milestone overview linked to the existing detailed engineering roadmap and an Unreleased change history. |
+| `.github/ISSUE_TEMPLATE/bug_report.yml`, `.github/ISSUE_TEMPLATE/feature_request.yml`, `.github/ISSUE_TEMPLATE/config.yml`, `.github/PULL_REQUEST_TEMPLATE.md` | Added issue forms, a security-policy link in the issue chooser, and review prompts. |
+| `.github/workflows/ci.yml` | Added independent Backend and Frontend checks on main pushes and PRs into main. CI starts the runner's native PostgreSQL service, creates job-local databases and credentials, and uses read-only repository permissions. |
+| `.editorconfig` | Added encoding, line ending, indentation, and final newline defaults. |
+| `README.md`, `.env.example`, `.gitignore`, `DEVELOPMENT_STATUS.md` | Updated the contributor entry point, database pool and Vite environment guidance, ignore rules, and verification record. |
+
+### OS-1 verification
+
+Local verification used Python 3.13.14, PostgreSQL 18, Node.js 24.19.0, and npm 11.17.0.
+The Python launcher found no standalone installation, so the checks used pgAdmin's bundled
+Python and the existing ignored development packages. The Alembic and pytest commands below
+identify the module entry points invoked with that interpreter. Both database URLs targeted
+the disposable cluster on loopback port 55432. Its startup and shutdown procedure appears
+in the historical environment notes below. Frontend checks used the existing installed
+dependencies in `frontend`.
+
+| Check | Local result |
+| --- | --- |
+| `alembic -c backend/alembic.ini upgrade head`, `current`, `check` | Head `20261117_0002`. No new upgrade operations detected. |
+| `pytest backend/tests -ra` with `TEST_DATABASE_URL` | 28 passed, zero skipped. Includes migration downgrade/upgrade, drift, concurrency, and audit rollback. One upstream Starlette/HTTPX test-client deprecation warning. |
+| `npm.cmd exec -- tsc -b` | Passed. |
+| `npm.cmd run test -- --run` | 2 tests passed. |
+| `npm.cmd run build` | TypeScript and Vite production build passed. |
+| PyYAML parsing and structural checks | Parsed the workflow, both issue forms, and the chooser. Checked triggers, jobs, permissions, cache inputs, form fields and contact-link structure. |
+| Markdown link and heading check | Resolved 24 local links across 14 Markdown files. Hosted workflow, badge, and security-policy presentation require verification on GitHub after adoption. |
+| `git diff --check` and working-tree review | Passed. Checked whitespace and common credential signatures across all 16 changed and new files. Reviewed credential examples and CI password handling. |
+| `git check-ignore` and `git ls-files` | Local environment files, virtual environments, dependencies, build output, temporary database files, and sample private-key paths are ignored. The root example environment file is tracked. |
+
+### GitHub configuration and remaining verification
+
+1. Review the branch and submit the changes for review. Confirm Actions is enabled and
+   inspect the first hosted Backend and Frontend job results. Local checks used Windows.
+2. Once the checks have run, configure the desired `main` ruleset and select **Backend**
+   and **Frontend** as required checks if enforcing CI before merge.
+3. Enable or confirm private vulnerability reporting in repository settings. After adoption
+   on the default branch, check that the security policy, reporting button, issue chooser,
+   pull request template, and CI badge render as intended.
+4. Review OS-1 and explicitly approve Phase 2 Milestone 2 before beginning implementation.
+
+## Phase 2 Milestone 1 — November 18, 2026
+
+### Completed functionality
 
 Phase 0 architecture and Phase 1 application foundations are preserved. This milestone adds:
 
@@ -27,7 +79,7 @@ Phase 0 architecture and Phase 1 application foundations are preserved. This mil
 No Docker command was used. Existing container files were left in place. The frontend
 source remains unchanged for this backend milestone.
 
-## Verification executed
+### Milestone 1 verification
 
 | Check | Result |
 | --- | --- |
@@ -50,7 +102,7 @@ One upstream deprecation warning remains: the installed Starlette version deprec
 HTTPX-backed test client. It does not affect the passing tests; migrating the test transport
 can be handled separately when updating dependencies.
 
-## Local verification environment
+### Milestone 1 local verification environment
 
 The machine has PostgreSQL 18 and pgAdmin's bundled Python 3.13.14, but `py -0p` reports no
 standalone Python installation. Verification therefore used the bundled interpreter with
