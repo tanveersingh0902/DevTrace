@@ -1,0 +1,23 @@
+name: Feature request
+description: Propose an improvement to DevTrace.
+title: "[Feature] "
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Describe who encounters it and what they are trying to do.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: How would a contributor know the change meets your need?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Alternatives and roadmap context
+      description: Share workarounds you have tried or a milestone this relates to.

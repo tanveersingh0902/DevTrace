@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: postgresql+psycopg://devtrace_ci@127.0.0.1:5432/devtrace_ci
+      TEST_DATABASE_URL: postgresql+psycopg://devtrace_ci@127.0.0.1:5432/devtrace_ci_test
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/pyproject.toml
+      - name: Install API and test dependencies
+        run: python -m pip install -e "./backend[dev]"
+      - name: Prepare local PostgreSQL databases
+        run: |
+          sudo systemctl start postgresql.service
+          password=$(openssl rand -hex 32)
+          echo "::add-mask::$password"
+          sudo -u postgres psql -v ON_ERROR_STOP=1 -c "CREATE ROLE devtrace_ci LOGIN PASSWORD '$password'"
+          sudo -u postgres createdb --owner=devtrace_ci devtrace_ci
+          sudo -u postgres createdb --owner=devtrace_ci devtrace_ci_test
+          echo "PGPASSWORD=$password" >> "$GITHUB_ENV"
+      - name: Apply migrations and check for schema drift
+        run: |
+          python -m alembic -c backend/alembic.ini upgrade head
+          python -m alembic -c backend/alembic.ini check
+      - name: Run backend tests with PostgreSQL
+        run: python -m pytest backend/tests -ra
+
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Check TypeScript
+        run: npm exec -- tsc -b
+      - name: Run frontend tests
+        run: npm run test -- --run
+      - name: Build for production
+        run: npm run build

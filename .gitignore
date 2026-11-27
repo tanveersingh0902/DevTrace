@@ -1,39 +1,39 @@
-# Environment and secrets
+# Environment, local credentials, and private keys
 .env
 .env.*
 !.env.example
+.aws/
+.pgpass
+pgpass.conf
+*.pem
+*.key
+*.p12
+*.pfx
 
-# Python
+# Python environments, packaging, and caches
+.venv/
+venv/
 __pycache__/
 *.py[cod]
-.pytest_cache/
-.coverage
-htmlcov/
-.venv/
-backend/.venv/
-
-
-# Python packaging
 *.egg-info/
-**/*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
 build/
 dist/
 
-# Python Virtual Environments
-venv/
-.venv/
-**/venv/
-**/.venv/
-
-# Node
+# Node dependencies and generated output
 node_modules/
-frontend/node_modules/
-frontend/dist/
-frontend/coverage/
+coverage/
+*.tsbuildinfo
 
-# Tooling and OS
-.mypy_cache/
-.ruff_cache/
+# Local verification tools, database files, and temporary output
 .local/
+*.log
+*.tmp
+*.swp
 .DS_Store
 Thumbs.db

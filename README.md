@@ -1,140 +1,169 @@
 # DevTrace
 
-DevTrace is an open-source codebase intelligence platform for understanding repositories
-through static analysis, dependency mapping, architecture exploration and grounded AI.
+[![CI on main](https://github.com/tanveersingh0902/DevTrace/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/tanveersingh0902/DevTrace/actions/workflows/ci.yml)
+[![License MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Phase 1 is complete. **Phase 2, Milestone 1: registration foundation** is implemented.
-The API supports account registration with Argon2id, normalized unique emails, audit events
-and shared rate limits. Login, JWT/refresh sessions, projects, RBAC and authentication UI
-are scheduled in the remaining Phase 2 milestones. Analysis and AI remain deferred.
+DevTrace is an open-source project for understanding how a codebase fits together. Its vision is a navigable map of files, symbols, and dependencies, with AI explanations that cite a specific repository revision.
 
-## Stack and prerequisites
+## The problem
 
-- Backend: Python 3.11+, FastAPI, Pydantic, SQLAlchemy 2.x, Alembic
-- Frontend: Node.js 20+, React, TypeScript, Vite, Tailwind, React Router, Axios
-- Database: locally installed PostgreSQL 15+ (verified with PostgreSQL 18)
-- Tests: Pytest and Vitest/React Testing Library
+Tracing a request through an unfamiliar repository often means following imports by hand and checking whether an architecture diagram still matches the code. DevTrace aims to let a developer follow those relationships back to the source lines that support them.
 
-Use local PostgreSQL for this phase. Docker is not required or used. Historical container
-files remain from Phase 1.
+## What works today
 
-## Local database setup
+- A React dashboard shell with routing, reusable components, and an empty project state.
+- A FastAPI service with liveness (`/health`), PostgreSQL readiness (`/ready`), version metadata (`/api/v1`), request IDs, and structured errors.
+- Account registration at `POST /api/v1/auth/register`. It normalizes email addresses, enforces uniqueness in PostgreSQL, hashes passwords with Argon2id, and commits the account and audit event together. PostgreSQL also stores the per-client registration limit.
+- Alembic migrations and PostgreSQL integration tests for registration, concurrency, audit rollback, rate limiting, and migration round trips.
 
-Start your installed PostgreSQL service. On Windows its name depends on your installation
-(for example, `postgresql-x64-18`). Use Services or an elevated terminal if required.
-Ensure PostgreSQL's `bin` directory is on PATH before running the following commands.
+## Planned features and roadmap
 
-Create a development login interactively; choose a local password when prompted:
+Phase 0, Phase 1, and Phase 2 Milestone 1 are implemented. **Authentication and Sessions** is next. Later Phase 2 milestones cover project access, roles, and browser authentication. Repository intake, static analysis, graph exploration, and grounded AI are planned in subsequent phases. [Public roadmap](ROADMAP.md) · [Verification history](DEVELOPMENT_STATUS.md)
+
+## Stack and architecture
+
+| Layer | Current implementation |
+| --- | --- |
+| Browser | React, TypeScript, React Router, Vite, Tailwind CSS, Axios |
+| API | Python, FastAPI, Pydantic Settings, Argon2id |
+| Persistence | PostgreSQL, SQLAlchemy 2, psycopg 3, Alembic |
+| Verification | pytest, Vitest, React Testing Library, TypeScript compiler |
+
+The backend is a modular monolith. The diagram shows the implemented registration path. Registration is currently available through the API. The browser's dashboard is a separate entry point.
+
+```mermaid
+flowchart LR
+    Browser["Browser"] --> UI["React dashboard"]
+    Client["API client"] --> Route["FastAPI registration route"]
+    Route --> Limit["Rate limit service"]
+    Route --> Register["Registration service"]
+    Limit --> Repo["Repositories"]
+    Register --> Repo
+    Repo --> DB[("PostgreSQL")]
+```
+
+The design documents describe the intended worker, graph, and AI boundaries as well as the current API and schema. [Architecture](ARCHITECTURE.md) · [API design](API_DESIGN.md) · [Database design](DATABASE_DESIGN.md)
+
+## Repository structure
+
+```text
+.github/             Issue forms, pull request template, and CI
+backend/
+  app/               API routes, services, repositories, models, and settings
+  alembic/           Migration environment and versioned revisions
+  tests/             Unit, API, PostgreSQL, and migration tests
+  pyproject.toml     Python runtime and development dependencies
+frontend/
+  src/               React app, dashboard, components, API client, and tests
+  package-lock.json  npm dependency lockfile
+docs/                Phase 2 milestones, implementation guide, and exit criteria
+```
+
+## Local development on Windows
+
+Install Git, a standalone Python 3.11+ with the Windows launcher, Node.js 20+ with npm, and a local PostgreSQL 15+ server with its command-line tools on `PATH`. Run the examples in PowerShell. Start in the repository root unless a command changes directory.
+
+```powershell
+git clone https://github.com/tanveersingh0902/DevTrace.git
+Set-Location DevTrace
+py -3 -m venv backend/.venv
+.\backend\.venv\Scripts\python.exe -m pip install -e "./backend[dev]"
+```
+
+### PostgreSQL and environment variables
+
+Start your installed PostgreSQL service using Windows Services. For a new setup, run the commands below as the PostgreSQL administrator and choose a local password for the `devtrace` login. Reuse the role and databases if you already created them.
 
 ```powershell
 createuser -h localhost -U postgres --pwprompt devtrace
 createdb -h localhost -U postgres --owner=devtrace devtrace
 createdb -h localhost -U postgres --owner=devtrace devtrace_test
-```
-
-Do not recreate these objects if they already exist. `devtrace_test` is a separate database
-for tests; never point tests at your development or production database.
-
-From the repository root, create `.env` only if missing:
-
-```powershell
 if (!(Test-Path .env)) { Copy-Item .env.example .env }
 ```
 
-Edit `DATABASE_URL` in `.env` to match your local credentials, using the
-`postgresql+psycopg://` scheme and `localhost`. Percent-encode special characters in the
-URL password. Do not commit `.env`. `POSTGRES_*` variables describe the local setup but do
-not create a database automatically. Registration limits default to five attempts per
-client address per hour and can be configured in `.env`.
+Edit the root `.env` before starting the API. Use a URL-encoded password in the database URL. [Configuration example](.env.example)
 
-## Backend setup and startup
+| Setting | Purpose |
+| --- | --- |
+| `DATABASE_URL` | API and Alembic connection, e.g. `postgresql+psycopg://devtrace:YOUR_ENCODED_PASSWORD@localhost:5432/devtrace` |
+| `TEST_DATABASE_URL` | Shell variable used by pytest. Use a separate local database ending in `_test` whose owner can create schemas. |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT` | Describe local database settings. Set up the server and login using PostgreSQL tools and keep `DATABASE_URL` in sync. |
+| `APP_ENV`, `APP_NAME`, `API_V1_PREFIX`, `LOG_LEVEL` | Application environment, title, versioned route prefix, and log level |
+| `CORS_ORIGINS` | Comma-separated browser origins, default `http://localhost:5173` |
+| `DATABASE_POOL_SIZE`, `DATABASE_MAX_OVERFLOW` | SQLAlchemy pool capacity and additional connections, default 5 and 10 |
+| `REGISTRATION_RATE_LIMIT`, `REGISTRATION_RATE_WINDOW_SECONDS` | Registration attempts per client and window, default 5 per 3,600 seconds |
+| `VITE_API_BASE_URL` | Public API origin compiled into the frontend, default `http://localhost:8000`. Set in the frontend shell or `frontend/.env.local` before starting or building Vite. |
 
-From the repository root, using a standalone Python installation:
+### Migrate and start the backend
 
 ```powershell
-py -3 -m venv backend/.venv
-backend/.venv/Scripts/python.exe -m pip install -e "./backend[dev]"
-backend/.venv/Scripts/python.exe -m alembic -c backend/alembic.ini upgrade head
-backend/.venv/Scripts/python.exe -m uvicorn app.main:app --app-dir backend --reload --no-proxy-headers
+$python = '.\backend\.venv\Scripts\python.exe'
+& $python -m alembic -c backend/alembic.ini upgrade head
+& $python -m alembic -c backend/alembic.ini current
+& $python -m uvicorn app.main:app --app-dir backend --reload --no-proxy-headers
 ```
 
-Open API docs at `http://localhost:8000/docs`. Check liveness/readiness:
+Alembic creates the users, audit events, and rate-limit tables. The local startup command uses the peer address for rate limiting. In a second PowerShell window, open `http://localhost:8000/docs` or check the running API.
 
 ```powershell
 Invoke-RestMethod http://localhost:8000/health
 Invoke-RestMethod http://localhost:8000/ready
 ```
 
-Migrations create users, audit events and authentication rate-limit tables. The application
-never calls ORM `create_all`. `--no-proxy-headers` keeps local rate limits tied to the real
-peer address; configure explicit trusted proxies if deploying behind a proxy.
-
-## Try registration
+To try registration, submit an example account to the local API.
 
 ```powershell
 $body = @{
   email = 'person@example.com'
-  password = 'replace with a unique passphrase'
+  password = 'example passphrase for local testing'
   display_name = 'Person'
 } | ConvertTo-Json
 Invoke-RestMethod -Method Post -Uri http://localhost:8000/api/v1/auth/register -ContentType 'application/json' -Body $body
 ```
 
-The first request returns HTTP 201 and public user fields. Repeating the email returns
-409. Invalid fields return 422. Attempts beyond the configured budget return 429 with
-`Retry-After`. Registration does not start a session or issue tokens yet.
+A successful request returns HTTP 201 with public user fields. Duplicate emails return 409, invalid fields return 422, and exhausted rate limits return 429 with `Retry-After`.
 
-## Frontend
+### Start the frontend
 
-In a second terminal:
+From the repository root in a separate terminal, run the following commands and open `http://localhost:5173`.
 
 ```powershell
 Set-Location frontend
-npm ci
-npm run dev
+npm.cmd ci
+npm.cmd run dev
 ```
 
-Open `http://localhost:5173`. Milestone 1 preserves the existing frontend shell; registration
-and login pages will arrive together with complete browser authentication in Milestone 4.
+## Verification
 
-## Tests and migration checks
-
-Backend unit/system tests without PostgreSQL:
+From the root, set the test URL **in the shell** and replace the password placeholder. Each PostgreSQL test migrates a randomly named schema and removes it after the test. Use a dedicated test database.
 
 ```powershell
-backend/.venv/Scripts/python.exe -m pytest backend/tests -m "not postgres"
+$python = '.\backend\.venv\Scripts\python.exe'
+$env:TEST_DATABASE_URL = 'postgresql+psycopg://devtrace:YOUR_ENCODED_PASSWORD@localhost:5432/devtrace_test'
+& $python -m pytest backend/tests -ra
+& $python -m alembic -c backend/alembic.ini check
 ```
 
-Complete backend suite, including real PostgreSQL registration and migration tests:
+The drift check uses `DATABASE_URL` and requires the development database to be at the migration head. For a quick run without PostgreSQL, use `& $python -m pytest backend/tests -m "not postgres"`. The full suite skips database cases if the test URL is absent.
+
+After installing the frontend dependencies, run the checks from `frontend`.
 
 ```powershell
-$env:TEST_DATABASE_URL = 'postgresql+psycopg://devtrace:YOUR_URL_ENCODED_PASSWORD@localhost:5432/devtrace_test'
-backend/.venv/Scripts/python.exe -m pytest backend/tests -ra
-backend/.venv/Scripts/python.exe -m alembic -c backend/alembic.ini check
+npm.cmd exec -- tsc -b
+npm.cmd run test -- --run
+npm.cmd run build
 ```
 
-`TEST_DATABASE_URL` must be set in the shell, not just `.env`. It must name a local database
-ending in `_test`, owned by the test login so it can create schemas. Tests create/migrate a
-random schema per test and remove only that schema. They do not drop the database or touch
-its public schema. PostgreSQL tests explicitly skip if the variable is absent; such a run
-is not full milestone verification. A configured but unavailable database fails the tests.
-`alembic check` uses the normal `DATABASE_URL` and should follow `upgrade head`.
+CI runs both jobs on pushes and pull requests targeting `main`. The project currently has no dedicated lint or format commands. [CI workflow](.github/workflows/ci.yml)
 
-Frontend tests and TypeScript/production build:
+## Contributing
 
-```powershell
-Set-Location frontend
-npm run test -- --run
-npm run build
-```
+Use the issue forms for bugs and proposals. The contributor guide covers branch setup, tests, and pull request review. [Contributing](CONTRIBUTING.md) · [Code of conduct](CODE_OF_CONDUCT.md) · [Changelog](CHANGELOG.md)
 
-## Delivery status
+## Security
 
-See [DEVELOPMENT_STATUS.md](DEVELOPMENT_STATUS.md) for executed verification and
-[docs/PHASE_2_MILESTONES.md](docs/PHASE_2_MILESTONES.md) for milestones, implementation
-decisions and the file guide. API and schema details are in [API_DESIGN.md](API_DESIGN.md)
-and [DATABASE_DESIGN.md](DATABASE_DESIGN.md).
+Report suspected vulnerabilities privately and redact sensitive data from examples. [Security policy](SECURITY.md)
 
-Work stops after Milestone 1 for user verification. Phase 2 is not complete until token
-rotation/revocation, the authorization matrix, cross-project denial and browser flows
-are implemented and tested. Do not start Phase 3.
+## License
+
+Copyright (c) 2026 Tanveer Singh. DevTrace is distributed under the [MIT License](LICENSE).
