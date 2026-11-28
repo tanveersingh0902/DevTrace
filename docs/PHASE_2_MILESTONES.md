@@ -62,8 +62,8 @@ out of scope. Preserve the modular monolith and use local PostgreSQL and Alembic
 
 ## Full Phase 2 exit checklist (not yet satisfied)
 
-- [ ] Login and JWT claims/signature/type/expiry validation tested.
-- [ ] Refresh rotation, concurrent refresh, replay detection and revocation tested.
+- [x] Login and JWT claims/signature/type/expiry validation tested.
+- [x] Refresh rotation, concurrent refresh, replay detection and revocation tested.
 - [ ] Project CRUD and Owner/Admin/Member/Viewer permission matrix tested.
 - [ ] Cross-project access denied at backend boundaries.
 - [ ] Required authentication/project/membership audit events tested.

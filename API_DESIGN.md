@@ -2,7 +2,7 @@
 
 **Base path:** `/api/v1`
 **Format:** HTTPS JSON, UTF-8
-**Status:** `/health`, `/ready`, `/api/v1` metadata, and `/api/v1/auth/register` are
+**Status:** `/health`, `/ready`, `/api/v1` metadata, and the registration, login, refresh, logout, and current-user routes are
 implemented. All other feature endpoints below remain planned.
 
 ## Conventions
@@ -86,7 +86,7 @@ and `user.registered` audit insertion commit together.
 
 The duplicate response has generic wording but its status distinguishes existing emails;
 it is not enumeration-proof. Full indistinguishable registration would need a mailbox
-verification flow. Login will use generic invalid-credential responses in Milestone 2.
+verification flow. Login uses generic invalid-credential responses and performs Argon2id verification for unknown accounts.
 
 Registration allows five attempts per client address per 3,600-second window by default.
 Counters are PostgreSQL-backed and survive worker restarts. Valid JSON requests consume
@@ -129,6 +129,55 @@ belong to the conversation run. The response contains assistant content plus nav
 citations (`node_id`, `file_id`, line range). The first release is non-streaming. Provider
 failures have safe retryable/non-retryable codes and no provider internals.
 
+## Authentication sessions
+
+The following sequence also serves as a manual smoke test. Start the migrated API over
+HTTPS, configure its signing secret, and register a disposable account as described
+above. Use an HTTP client with an in-memory cookie jar. Keep access tokens in memory.
+
+| Step | Request | Expected response |
+| --- | --- | --- |
+| 1 | POST `/api/v1/auth/login` with JSON `{"email":"person@example.com","password":"a long unique passphrase"}` | 200, `{"access_token":"<JWT>","token_type":"bearer"}` and a `devtrace_refresh` cookie |
+| 2 | GET `/api/v1/auth/me` with `Authorization: Bearer <JWT>` | 200, the same six public user fields returned by registration |
+| 3 | POST `/api/v1/auth/refresh` with the cookie and an empty body | 200, a new access token and replacement cookie with the original family expiry |
+| 4 | POST `/api/v1/auth/logout` with the replacement cookie and an empty body | 204, empty body, cookie cleared. Repeating the request returns 204 |
+| 5 | Repeat step 2 using either access token | 401 after the logout transaction commits |
+
+Send `X-CSRF-Protection: 1` on each of the three POST operations. Browser forms cannot
+set this custom header. Cross-origin scripts require a successful credentialed CORS
+preflight. Any supplied Origin must exactly match a trusted origin in `CORS_ORIGINS`.
+Use same-site HTTPS for the UI and API and include credentials on browser requests.
+The host-only refresh cookie uses HttpOnly, Secure, SameSite=Strict and Path=/api/v1/auth
+under the default API prefix. Auth responses with credentials or user data use no-store.
+
+The HS256 key comes from `JWT_SIGNING_SECRET` (minimum 32 characters, generate with a
+cryptographic random source). Without the key, issuance fails closed with 503.
+`JWT_ISSUER` and `JWT_AUDIENCE` default to devtrace and devtrace-api. Access JWTs carry
+sub, sid, jti, iat, exp, iss, aud and type=access. Their lifetime is capped by both
+`ACCESS_TOKEN_MINUTES` (15) and the absolute `REFRESH_SESSION_DAYS` deadline (7 days).
+Changing the key immediately invalidates outstanding access tokens. Active refresh
+sessions can obtain tokens signed with the new key.
+
+Each opaque refresh token contains 256 random bits. PostgreSQL retains its digest and
+rotation time. A reused token revokes the whole login session, including its access tokens.
+Other logins remain usable. Serialize refresh calls per session, including across tabs.
+A lost successful refresh response followed by retrying the old cookie requires a fresh login.
+Logout also accepts a previously issued token from that family.
+
+| Status | Meaning |
+| --- | --- |
+| 401 | Invalid credentials, access token, or refresh session |
+| 403 | Missing CSRF header or untrusted Origin |
+| 422 | Invalid login body |
+| 429 | Login budget exhausted. Retry-After gives seconds |
+| 503 | Signing key unavailable |
+
+The login budget defaults to 10 attempts per client address per 900 seconds
+(`LOGIN_RATE_LIMIT`, `LOGIN_RATE_WINDOW_SECONDS`). Configure trusted proxy handling at
+deployment so the ASGI client address represents the caller. Audit records include login
+success/failure, successful rotation, detected reuse and logout. Session state changes
+and their audit events commit together.
+
 ## Browser authentication and communication
 
 One typed Axios client adds base URL, headers, request ID, and in-memory bearer token. On a
@@ -137,7 +186,7 @@ refresh failure clears client auth and routes to login. Access tokens never go i
 session storage or URLs.
 
 Access tokens are short-lived JWT JSON responses. Refresh tokens are opaque, server-hashed,
-rotated `HttpOnly`, `Secure`, `SameSite` cookies scoped to the refresh endpoint. Login uses
+rotated `HttpOnly`, `Secure`, `SameSite` cookies scoped to the common auth path. Login uses
 generic failures to prevent enumeration. Additive API fields are compatible; breaking
 changes get a new version prefix. FastAPI OpenAPI becomes the authoritative machine-readable
 contract after Phase 1.

@@ -102,9 +102,9 @@ need is measured. See `API_DESIGN.md` for contract details.
 
 Passwords use Argon2id. Login returns a short-lived signed JWT access token held only in
 memory, and sets a rotated opaque refresh token cookie. Refresh tokens are server-hashed,
-`HttpOnly`, `Secure`, `SameSite`, and refresh-path scoped. JWT claims are minimal: user ID,
+`HttpOnly`, `Secure`, `SameSite`, and scoped to the common auth path for refresh and logout. JWT claims are minimal: user ID,
 session ID, issuer/audience, token type, issued/expiry. Logout revokes the current session;
-password change/account disable revoke all. Every project/run/file/graph/source/AI action
+the reusable current-user dependency checks session ownership, expiry, revocation, and active user status on each protected request. Account and password management are planned. Every project/run/file/graph/source/AI action
 has service-layer resource membership enforcement.
 
 Phase 2's requested roles replace the original Editor design. This matrix is planned for

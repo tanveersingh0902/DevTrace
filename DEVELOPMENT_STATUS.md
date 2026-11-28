@@ -1,8 +1,22 @@
 # Development Status
 
-Updated November 27, 2026. Phase OS-1 establishes the open-source repository foundation on
-`chore/open-source-foundation`. Phase 2 remains in progress. Registration is implemented.
-The next milestone, **Phase 2 Milestone 2 — Authentication and Sessions**, awaits manual approval.
+Updated November 28, 2026. Phase 2 Milestone 2 is implemented on
+`feature/auth-sessions` and awaits manual verification before Milestone 3.
+
+## Phase 2 Milestone 2 verification
+
+The clean-branch baseline passed all 28 backend tests. After implementation, 47 backend
+tests passed with PostgreSQL enabled, including concurrent rotation, earlier-token reuse,
+rollback on audit failure, session revocation and registration regressions. One existing
+Starlette/HTTPX deprecation warning remains. Alembic upgraded to `20261128_0003` and
+reported no drift. TypeScript, both frontend tests and the Vite production build passed.
+The repository defines no separate linter. These checks ran locally on Windows using
+the retained PostgreSQL cluster and Python setup described below. Hosted CI is pending.
+
+Run the [verification commands](README.md#verification) and follow the
+[session API walkthrough](API_DESIGN.md#authentication-sessions). Clients must serialize
+refresh requests. Each protected call checks PostgreSQL, so logout takes effect on the
+next request. Expired sessions and token history currently require operational cleanup.
 
 ## Phase OS-1 — Repository foundation
 
@@ -53,7 +67,7 @@ dependencies in `frontend`.
 3. Enable or confirm private vulnerability reporting in repository settings. After adoption
    on the default branch, check that the security policy, reporting button, issue chooser,
    pull request template, and CI badge render as intended.
-4. Review OS-1 and explicitly approve Phase 2 Milestone 2 before beginning implementation.
+4. The maintainer subsequently requested Phase 2 Milestone 2 on its feature branch.
 
 ## Phase 2 Milestone 1 — November 18, 2026
 
@@ -136,8 +150,7 @@ $env:TEST_DATABASE_URL = 'postgresql+psycopg://devtrace_test@127.0.0.1:55432/dev
 ## Remaining milestones and verification gate
 
 1. **Milestone 1: registration foundation** - implemented, tests passed, awaiting user verification.
-2. **Milestone 2: authentication sessions** - not started. Login, JWT access tokens, refresh
-   sessions/rotation/reuse detection, logout/revocation, protected dependencies, login/logout audit.
+2. **Milestone 2: authentication sessions** - implemented and locally verified. Manual review pending.
 3. **Milestone 3: project access** - not started. Project CRUD/ownership, memberships,
    Owner/Admin/Member/Viewer backend enforcement, project/membership audit and denial tests.
 4. **Milestone 4: browser flows and Phase 2 verification** - not started. Auth pages/context,

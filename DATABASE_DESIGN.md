@@ -4,7 +4,7 @@
 **Access/migrations:** SQLAlchemy 2.x and Alembic
 
 **Implemented:** Phase 2 Milestone 1 creates `users`, `audit_events`, and
-`auth_rate_limits`. Other tables in the design remain planned.
+`auth_rate_limits`. Milestone 2 adds session families and token history.
 
 ## Milestone 1 schema
 
@@ -37,6 +37,21 @@ and migrates a random `devtrace_test_<uuid>` schema and drops only that schema a
 They exercise real PostgreSQL constraints, migration upgrade/downgrade, schema drift,
 concurrency, rollback and API persistence. SQLite is not substituted.
 
+## Milestone 2 schema
+
+Revision `20261128_0003` adds two tables. Each login creates a UUID family in
+`refresh_sessions` with an indexed user foreign key, creation time, indexed absolute
+expiry and nullable revocation time. Its primary key doubles as the family identifier.
+`refresh_tokens` stores a SHA-256 hex digest as its primary key, an indexed session
+foreign key, issuance time and nullable consumption time. Both foreign keys cascade
+on deletion. Time columns use PostgreSQL timestamptz.
+
+Refresh and logout lock the parent row. After the lock is granted, a fresh read at
+PostgreSQL's default READ COMMITTED isolation sees any previous rotation. The old
+digest remains available for replay detection throughout the family's lifetime.
+Downgrading to `20261117_0002` drops both tables and invalidates all sessions.
+There is no scheduled history cleanup in this milestone.
+
 ## Data rules
 
 - PostgreSQL is authoritative for product and analysis state.
@@ -51,7 +66,8 @@ concurrency, rollback and API persistence. SQLite is not substituted.
 | Table | Purpose and essential fields |
 | --- | --- |
 | `users` | ID, normalized unique email, password hash, display name, active flag, timestamps |
-| `refresh_sessions` | ID, user ID, unique token hash, expiry/revocation/rotation, bounded device/IP metadata |
+| `refresh_sessions` | Family/session UUID, user ID, creation, expiry and revocation time |
+| `refresh_tokens` | Unique refresh digest, family ID, creation and consumption time |
 | `projects` | ID, owner ID, name, slug, description, archive/timestamps; unique owner+slug |
 | `project_memberships` | Project/user IDs, role, created timestamp; unique project+user |
 | `repository_sources` | Project ID, source type, canonical URL, default ref, active state; no plaintext credential |

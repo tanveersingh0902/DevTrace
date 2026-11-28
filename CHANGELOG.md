@@ -6,6 +6,8 @@ This project records notable changes using [Keep a Changelog](https://keepachang
 
 ### Added
 
+- Login, current-user lookup, rotating refresh cookies, session revocation and replay detection backed by PostgreSQL. Migration `20261128_0003` adds refresh families and token history.
+
 - React dashboard shell and FastAPI foundation with liveness, database readiness, and API metadata endpoints.
 - PostgreSQL account registration with Argon2id passwords, registration audit events, shared rate limits, and reversible Alembic migrations.
 - MIT license, community policies, contributor guide, public roadmap, issue forms, and a pull request template.
