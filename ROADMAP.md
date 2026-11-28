@@ -1,12 +1,12 @@
 # DevTrace roadmap
 
-DevTrace's first end-to-end user action is account registration. The next milestone is **Phase 2 Milestone 2 — Authentication and Sessions**, pending maintainer approval. The sequence below describes scope without promising release dates.
+DevTrace supports registration and authenticated API sessions. Phase 2 Milestone 2 awaits manual verification before project access work begins. The sequence below describes scope without promising release dates.
 
 | Phase | Status | Outcome |
 | --- | --- | --- |
 | 0 · Architecture | Complete | System boundaries, API design, data model, and phased delivery plan |
 | 1 · Foundation | Complete | React shell, FastAPI probes and metadata, PostgreSQL migrations, and test harnesses |
-| 2 · Identity and project access | In progress | M1 registration implemented. M2 adds login and session rotation/revocation. M3 adds project access and roles. M4 adds browser flows and phase exit checks. |
+| 2 · Identity and project access | In progress | M1 registration and M2 login, rotation, and revocation implemented. M3 adds project access and roles. M4 adds browser flows and phase exit checks. |
 | 3 · Repository intake | Planned | Repository source registration, durable jobs, and worker recovery |
 | 4 · Structural analysis | Planned | File and symbol extraction for a first supported language |
 | 5 · Dependency graph | Planned | Persisted graph and bounded explorer API |

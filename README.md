@@ -14,11 +14,12 @@ Tracing a request through an unfamiliar repository often means following imports
 - A React dashboard shell with routing, reusable components, and an empty project state.
 - A FastAPI service with liveness (`/health`), PostgreSQL readiness (`/ready`), version metadata (`/api/v1`), request IDs, and structured errors.
 - Account registration at `POST /api/v1/auth/register`. It normalizes email addresses, enforces uniqueness in PostgreSQL, hashes passwords with Argon2id, and commits the account and audit event together. PostgreSQL also stores the per-client registration limit.
+- Authenticated API sessions with JWT access, refresh rotation, logout, and current-user lookup. [Session API and walkthrough](API_DESIGN.md#authentication-sessions)
 - Alembic migrations and PostgreSQL integration tests for registration, concurrency, audit rollback, rate limiting, and migration round trips.
 
 ## Planned features and roadmap
 
-Phase 0, Phase 1, and Phase 2 Milestone 1 are implemented. **Authentication and Sessions** is next. Later Phase 2 milestones cover project access, roles, and browser authentication. Repository intake, static analysis, graph exploration, and grounded AI are planned in subsequent phases. [Public roadmap](ROADMAP.md) · [Verification history](DEVELOPMENT_STATUS.md)
+Phase 0, Phase 1, and Phase 2 Milestones 1 and 2 are implemented. Login, refresh, logout, and current-user lookup are ready for manual verification. Later Phase 2 milestones cover project access, roles, and browser authentication. Repository intake, static analysis, graph exploration, and grounded AI are planned in subsequent phases. [Public roadmap](ROADMAP.md) · [Verification history](DEVELOPMENT_STATUS.md)
 
 ## Stack and architecture
 
@@ -108,6 +109,12 @@ Alembic creates the users, audit events, and rate-limit tables. The local startu
 ```powershell
 Invoke-RestMethod http://localhost:8000/health
 Invoke-RestMethod http://localhost:8000/ready
+```
+
+For login, generate a private signing key in the API process environment before starting the server. Use the same value for every worker and persist it in your deployment secret store. The example environment lists lifetime, issuer, audience, and rate-limit settings. Use HTTPS for a client exercising the Secure refresh cookie.
+
+```powershell
+$env:JWT_SIGNING_SECRET = python -c "import secrets; print(secrets.token_urlsafe(48))"
 ```
 
 To try registration, submit an example account to the local API.

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -13,6 +13,7 @@ class Settings(BaseSettings):
         env_file=(".env", "../.env"),
         env_file_encoding="utf-8",
         extra="ignore",
+        hide_input_in_errors=True,
     )
 
     app_name: str = Field(default="DevTrace API", validation_alias="APP_NAME")
@@ -34,6 +35,21 @@ class Settings(BaseSettings):
     registration_rate_window_seconds: int = Field(
         default=3600, ge=1, le=86400, validation_alias="REGISTRATION_RATE_WINDOW_SECONDS"
     )
+
+    jwt_signing_secret: SecretStr | None = Field(default=None, min_length=32)
+    jwt_issuer: str = Field(default="devtrace", min_length=1)
+    jwt_audience: str = Field(default="devtrace-api", min_length=1)
+    access_token_minutes: int = Field(default=15, ge=1, le=60)
+    refresh_session_days: int = Field(default=7, ge=1, le=90)
+    login_rate_limit: int = Field(default=10, ge=1, le=1000)
+    login_rate_window_seconds: int = Field(default=900, ge=1, le=86400)
+
+    @field_validator("cors_origins_raw")
+    @classmethod
+    def explicit_origins(cls, value: str) -> str:
+        if any(origin.strip() in {"*", "null"} for origin in value.split(",")):
+            raise ValueError("Credentialed CORS requires explicit trusted origins.")
+        return value
 
     @property
     def cors_origins(self) -> list[str]:

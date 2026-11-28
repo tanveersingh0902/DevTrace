@@ -5,12 +5,10 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, field_validator
 
 
-class RegistrationRequest(BaseModel):
+class EmailRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
 
     email: Annotated[EmailStr, Field(max_length=254)]
-    password: Annotated[SecretStr, Field(min_length=12, max_length=128)]
-    display_name: Annotated[str, Field(min_length=1, max_length=100)]
 
     @field_validator("email", mode="before")
     @classmethod
@@ -22,6 +20,20 @@ class RegistrationRequest(BaseModel):
     def normalize_email(cls, value: str) -> str:
         # DevTrace treats the entire address as case insensitive; do not rewrite aliases.
         return value.lower()
+
+
+class LoginRequest(EmailRequest):
+    password: Annotated[SecretStr, Field(min_length=1, max_length=128)]
+
+
+class AccessResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
+
+class RegistrationRequest(EmailRequest):
+    password: Annotated[SecretStr, Field(min_length=12, max_length=128)]
+    display_name: Annotated[str, Field(min_length=1, max_length=100)]
 
     @field_validator("display_name")
     @classmethod

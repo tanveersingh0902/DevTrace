@@ -185,7 +185,7 @@ def test_migration_round_trip_and_metadata_agree(pg_engine, migration_config):
         assert set(inspect(connection).get_table_names()) == {"alembic_version"}
         command.upgrade(migration_config, "head")
         command.check(migration_config)
-        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20261117_0002"
+        assert connection.scalar(text("SELECT version_num FROM alembic_version")) == "20261128_0003"
 
 
 def test_invalid_request_id_is_replaced_before_audit(registration_client, pg_engine):
